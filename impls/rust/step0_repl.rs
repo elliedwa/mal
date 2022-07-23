@@ -1,33 +1,31 @@
-use std::io;
-use std::io::prelude::*;
-use std::string::String;
+extern crate rustyline;
 
-fn mal_read(in: &str) -> &str {
-    in
-}
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
-fn mal_eval(in: &str) -> &str {
-    in
-}
+fn main() {
+    // `()` can be used when no completer is required
+    let mut rl = Editor::<()>::new();
+    if rl.load_history(".mal-history").is_err() {
+        eprintln!("No previous history.");
+    }
 
-fn mal_print(in: &str) -> &str {
-    in
-}
-
-fn mal_rep(in: &str) -> &str {
-    let read = mal_read(in);
-    let eval = mal_eval(read);
-    let print = mal_print(eval);
-
-    print
-}
-
-fn main_loop() {
     loop {
-        print!("eval> ");
-        let mut in = String::new();
-        let check = io::stdin().read_line(&mut in);
-        if check == Ok(0) { break; }
-        println!("{}", in);
+        let readline = rl.readline("user> ");
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(&line);
+                rl.save_history(".mal-history").unwrap();
+                if line.len() > 0 {
+                    println!("{}", line);
+                }
+            }
+            Err(ReadlineError::Interrupted) => continue,
+            Err(ReadlineError::Eof) => break,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
     }
 }
