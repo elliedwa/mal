@@ -1,13 +1,12 @@
 // @import readline.ck
-// @import types/boxed/*.ck
 // @import types/MalObject.ck
 // @import types/mal/MalAtom.ck
+// @import types/mal/MalString.ck
 // @import types/mal/MalError.ck
 // @import types/mal/MalNil.ck
 // @import types/mal/MalFalse.ck
 // @import types/mal/MalTrue.ck
 // @import types/mal/MalInt.ck
-// @import types/mal/MalString.ck
 // @import types/mal/MalSymbol.ck
 // @import types/mal/MalKeyword.ck
 // @import types/mal/MalList.ck
@@ -30,7 +29,7 @@ fun MalObject EVAL(MalObject m, MalSubr env[])
 {
     if( m.type == "list" )
     {
-        if( (m$MalList).value().size() == 0 )
+        if( m.objects.size() == 0 )
         {
             return m;
         }
@@ -41,7 +40,7 @@ fun MalObject EVAL(MalObject m, MalSubr env[])
             return result;
         }
 
-        (result$MalList).value() @=> MalObject values[];
+        result.malObjectValues() @=> MalObject values[];
         values[0]$MalSubr @=> MalSubr subr;
         MalObject.slice(values, 1) @=> MalObject args[];
 
@@ -59,12 +58,12 @@ fun MalObject eval_ast(MalObject m, MalSubr env[])
 
     if( type == "symbol" )
     {
-        (m$MalSymbol).value() => string symbol;
+        m.stringValue => string symbol;
         env[symbol] @=> MalSubr subr;
 
         if( subr == null )
         {
-            return MalError.create(MalString.create("'" + symbol + "' not found"));
+            return MalError.create("'" + symbol + "' not found");
         }
         else
         {
@@ -73,7 +72,7 @@ fun MalObject eval_ast(MalObject m, MalSubr env[])
     }
     else if( type == "list" || type == "vector" || type == "hashmap" )
     {
-        (m$MalList).value() @=> MalObject values[];
+        m.malObjectValues() @=> MalObject values[];
         MalObject results[values.size()];
 
         if( type != "hashmap" )
@@ -117,6 +116,11 @@ fun MalObject eval_ast(MalObject m, MalSubr env[])
         {
             return MalHashMap.create(results);
         }
+        else
+        {
+            Util.panic("Programmer error (exhaustive match)");
+            return null;
+        }
     }
     else
     {
@@ -137,8 +141,7 @@ new MalDiv @=> repl_env["/"];
 
 fun string errorMessage(MalObject m)
 {
-    (m$MalError).value() @=> MalObject value;
-    return "exception: " + Printer.pr_str(value, true);
+    return "exception: " + String.repr(m.malObjectValue().stringValue);
 }
 
 fun string rep(string input)
@@ -171,7 +174,7 @@ fun void main()
         {
             rep(input) => string output;
 
-            if( output == "empty input" )
+            if( output == "exception: \"empty input\"" )
             {
                 // proceed immediately with prompt
             }

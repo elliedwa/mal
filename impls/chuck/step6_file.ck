@@ -1,13 +1,12 @@
 // @import readline.ck
-// @import types/boxed/*.ck
 // @import types/MalObject.ck
 // @import types/mal/MalAtom.ck
+// @import types/mal/MalString.ck
 // @import types/mal/MalError.ck
 // @import types/mal/MalNil.ck
 // @import types/mal/MalFalse.ck
 // @import types/mal/MalTrue.ck
 // @import types/mal/MalInt.ck
-// @import types/mal/MalString.ck
 // @import types/mal/MalSymbol.ck
 // @import types/mal/MalKeyword.ck
 // @import types/mal/MalList.ck
@@ -31,25 +30,32 @@ fun MalObject EVAL(MalObject m, Env env)
 {
     while( true )
     {
+        env.find("DEBUG-EVAL") @=> MalObject debugEval;
+        if( debugEval != null && (debugEval.type != "false" &&
+                                  debugEval.type != "nil" ) )
+        {
+            Util.println("EVAL: " + Printer.pr_str(m, true));
+        }
+
         if( m.type != "list" )
         {
             return eval_ast(m, env);
         }
 
-        if( (m$MalList).value().size() == 0 )
+        if( m.objects.size() == 0 )
         {
             return m;
         }
 
-        (m$MalList).value() @=> MalObject ast[];
+        m.malObjectValues() @=> MalObject ast[];
 
         if( ast[0].type == "symbol" )
         {
-            (ast[0]$MalSymbol).value() => string a0;
+            ast[0].stringValue => string a0;
 
             if( a0 == "def!" )
             {
-                (ast[1]$MalSymbol).value() => string a1;
+                ast[1].stringValue => string a1;
 
                 EVAL(ast[2], env) @=> MalObject value;
                 if( value.type == "error" )
@@ -63,11 +69,11 @@ fun MalObject EVAL(MalObject m, Env env)
             else if( a0 == "let*" )
             {
                 Env.create(env) @=> Env let_env;
-                Util.sequenceToMalObjectArray(ast[1]) @=> MalObject bindings[];
+                ast[1].malObjectValues() @=> MalObject bindings[];
 
                 for( 0 => int i; i < bindings.size(); 2 +=> i)
                 {
-                    (bindings[i]$MalSymbol).value() => string symbol;
+                    bindings[i].stringValue => string symbol;
                     EVAL(bindings[i+1], let_env) @=> MalObject value;
 
                     if( value.type == "error" )
@@ -125,12 +131,12 @@ fun MalObject EVAL(MalObject m, Env env)
             }
             else if( a0 == "fn*" )
             {
-                (ast[1]$MalList).value() @=> MalObject arg_values[];
+                ast[1].malObjectValues() @=> MalObject arg_values[];
                 string args[arg_values.size()];
 
                 for( 0 => int i; i < arg_values.size(); i++ )
                 {
-                    (arg_values[i]$MalSymbol).value() => args[i];
+                    arg_values[i].stringValue => args[i];
                 }
 
                 ast[2] @=> MalObject _ast;
@@ -145,7 +151,7 @@ fun MalObject EVAL(MalObject m, Env env)
             return result;
         }
 
-        (result$MalList).value() @=> MalObject values[];
+        result.malObjectValues() @=> MalObject values[];
         values[0].type => string type;
         MalObject.slice(values, 1) @=> MalObject args[];
 
@@ -163,6 +169,8 @@ fun MalObject EVAL(MalObject m, Env env)
             continue; // TCO
         }
     }
+    Util.panic("Programmer error: TCO loop left incorrectly");
+    return null;
 }
 
 fun MalObject eval_ast(MalObject m, Env env)
@@ -171,12 +179,11 @@ fun MalObject eval_ast(MalObject m, Env env)
 
     if( type == "symbol" )
     {
-        (m$MalSymbol).value() => string symbol;
-        return env.get(symbol);
+        return env.get(m.stringValue);
     }
     else if( type == "list" || type == "vector" || type == "hashmap" )
     {
-        (m$MalList).value() @=> MalObject values[];
+        m.malObjectValues() @=> MalObject values[];
         MalObject results[values.size()];
 
         if( type != "hashmap" )
@@ -219,6 +226,11 @@ fun MalObject eval_ast(MalObject m, Env env)
         else if( type == "hashmap" )
         {
             return MalHashMap.create(results);
+        }
+        else
+        {
+            Util.panic("Programmer error (exhaustive match)");
+            return null;
         }
     }
     else
@@ -285,8 +297,7 @@ repl_env.set("*ARGV*", MalList.create(MalArgv(args)));
 
 fun string errorMessage(MalObject m)
 {
-    (m$MalError).value() @=> MalObject value;
-    return "exception: " + Printer.pr_str(value, true);
+    return "exception: " + String.repr(m.malObjectValue().stringValue);
 }
 
 fun string rep(string input)
@@ -322,7 +333,7 @@ fun void main()
         {
             rep(input) => string output;
 
-            if( output == "empty input" )
+            if( output == "exception: \"empty input\"" )
             {
                 // proceed immediately with prompt
             }
